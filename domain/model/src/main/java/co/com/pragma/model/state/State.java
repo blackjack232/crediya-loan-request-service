@@ -1,6 +1,6 @@
 package co.com.pragma.model.state;
 import lombok.*;
-//import lombok.NoArgsConstructor;
+import lombok.NoArgsConstructor;
 
 
 @Getter

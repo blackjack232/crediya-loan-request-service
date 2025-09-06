@@ -2,11 +2,12 @@ package co.com.pragma.api.dto.request;
 
 import lombok.Data;
 
+import java.math.BigDecimal;
+
 @Data
 public class LoanRequest {
-    private String name;
-    private Double minAmount;
-    private Double maxAmount;
-    private Double interestRate;
-    private Boolean automaticValidation;
+    private Long identification;
+    private BigDecimal amount;
+    private int term;
+    private Long id_loan_type;
 }

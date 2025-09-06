@@ -28,10 +28,10 @@ public class RouterRest {
                     produces = {MediaType.APPLICATION_JSON_VALUE},
                     method = RequestMethod.POST,
                     beanClass = Handler.class,
-                    beanMethod = "createLoan",
+                    beanMethod = "createLoanRequest",
                     operation = @Operation(
-                            operationId = "createLoan",
-                            summary = "Create a new loan",
+                            operationId = "createLoanRequest",
+                            summary = "Create a new loan request",
                             requestBody = @RequestBody(
                                     required = true,
                                     content = @Content(
@@ -51,6 +51,6 @@ public class RouterRest {
     })
 
     public RouterFunction<ServerResponse> routerFunction(Handler handler) {
-        return route(POST("/api/loan-request"), handler::createLoan);
+        return route(POST("/api/loan-request"), handler::createLoanRequest);
     }
 }
