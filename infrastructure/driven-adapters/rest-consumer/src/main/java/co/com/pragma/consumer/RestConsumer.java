@@ -16,10 +16,11 @@ public class RestConsumer implements UserGateway {
 
     @CircuitBreaker(name = "userService")
     @Override
-    public Mono<Boolean> existsUserByNoIdentification(String identification) {
+    public Mono<Boolean> existsUserByNoIdentification(String identification, String authHeader) {
         return client
                 .get()
                 .uri("/api/users/{identification}", identification) // 🔹 pasas el número de identificación
+                .header("Authorization", authHeader)
                 .retrieve()
                 .bodyToMono(new ParameterizedTypeReference<ApiUserResponse<Boolean>>() {})
                 .map(ApiUserResponse::getData) // 🔹 obtenemos el campo `data`

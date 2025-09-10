@@ -22,10 +22,23 @@ public class Handler {
     private final LoanRequestMapper loanRequestMapper;
     private final LoanResponseMapper loanResponseMapper;
     public Mono<ServerResponse> createLoanRequest(ServerRequest serverRequest) {
+        String authHeader = serverRequest.headers().firstHeader("Authorization"); // 🔑 JWT recibido
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            ApiResponse<Object> errorResponse = ApiResponse.builder()
+                    .message("Token de autorizacion ausente o invalido")
+                    .code(401)
+                    .success(false)
+                    .data(null)
+                    .build();
+
+            return ServerResponse.status(HttpStatus.UNAUTHORIZED)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(errorResponse);
+        }
         return serverRequest.bodyToMono(LoanRequest.class)
-                .map(loanRequestMapper::toDomain)  // DTO → Domain
-                .flatMap(resquestsUseCase::createLoanRequest)
-                .map(loanResponseMapper::toResponse) // Domain → DTO
+                .map(loanRequestMapper::toDomain)
+                .flatMap(request -> resquestsUseCase.createLoanRequest(request, authHeader)) // 🔑 pasas el token
+                .map(loanResponseMapper::toResponse)
                 .flatMap(createLoanRequest -> {
                     ApiResponse<LoanResponse> response = ApiResponse.<LoanResponse>builder()
                             .message(LoanMessages.CREATE_LOAN_OK)
@@ -34,7 +47,7 @@ public class Handler {
                             .data(createLoanRequest)
                             .build();
 
-                    return ServerResponse.status(HttpStatus.CREATED) // 201
+                    return ServerResponse.status(HttpStatus.CREATED)
                             .contentType(MediaType.APPLICATION_JSON)
                             .bodyValue(response);
                 })
@@ -51,4 +64,5 @@ public class Handler {
                             .bodyValue(errorResponse);
                 });
     }
+
 }
