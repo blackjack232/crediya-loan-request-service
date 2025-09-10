@@ -6,13 +6,16 @@ import co.com.pragma.api.dto.response.LoanResponse;
 import co.com.pragma.api.mapper.LoanRequestMapper;
 import co.com.pragma.api.mapper.LoanResponseMapper;
 import co.com.pragma.model.loantype.constants.LoanMessages;
+import co.com.pragma.model.requests.Requests;
 import co.com.pragma.usecase.resquests.ResquestsUseCase;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 @RestController
@@ -64,5 +67,26 @@ public class Handler {
                             .bodyValue(errorResponse);
                 });
     }
+    public Mono<ServerResponse> getRequests(ServerRequest request) {
+        // 🔹 Leer parámetros de query
+        int page = request.queryParam("page").map(Integer::parseInt).orElse(0);
+        int size = request.queryParam("size").map(Integer::parseInt).orElse(10);
+        String filter = request.queryParam("filter").orElse(null);
+
+        //log.info("GET /api/v1/solicitud | page={}, size={}, filter={}", page, size, filter);
+
+        return ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(
+                        resquestsUseCase.execute(page, size, filter), // 👈 devuelve Flux<Requests>
+                        Requests.class
+                )
+                .onErrorResume(e -> {
+                    //log.error("Error procesando solicitud: {}", e.getMessage(), e);
+                    return ServerResponse.badRequest()
+                            .bodyValue("No se pudieron obtener las solicitudes, intente nuevamente");
+                });
+    }
+
 
 }

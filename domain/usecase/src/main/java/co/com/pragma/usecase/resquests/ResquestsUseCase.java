@@ -5,6 +5,7 @@ import co.com.pragma.model.requests.Requests;
 import co.com.pragma.model.requests.gateways.RequestsRepository;
 import co.com.pragma.model.user.gateways.UserGateway;
 import lombok.RequiredArgsConstructor;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.regex.Pattern;
@@ -60,4 +61,11 @@ public class ResquestsUseCase {
                             });
                 });
     }
+    public Flux<Requests> execute(int page, int size, String filter) {
+        //log.info("Obteniendo solicitudes para revisión manual | page={}, size={}, filter={}", page, size, filter);
+        return requestsRepository.findRequestsForManualReview(page, size, filter);
+               // .doOnComplete(() -> log.info("Listado de solicitudes obtenido correctamente"))
+               // .doOnError(e -> log.error("Error al obtener solicitudes: {}", e.getMessage(), e));
+    }
+
 }

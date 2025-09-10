@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.Parameter;
 import org.springdoc.core.annotations.RouterOperation;
 import org.springdoc.core.annotations.RouterOperations;
 import org.springframework.context.annotation.Bean;
@@ -47,10 +48,48 @@ public class RouterRest {
                                     )
                             }
                     )
+            ),
+            @RouterOperation(
+                    path = "/api/get-requests",
+                    produces = {MediaType.APPLICATION_JSON_VALUE},
+                    method = RequestMethod.GET,
+                    beanClass = Handler.class,
+                    beanMethod = "getRequests",
+                    operation = @Operation(
+                            operationId = "getRequests",
+                            summary = "Obtener listado de solicitudes para revision manual",
+                            parameters = {
+                                    @Parameter(
+                                            name = "page",
+                                            description = "Numero de pagina",
+                                            required = false,
+                                            schema = @Schema(type = "integer", defaultValue = "0")
+                                    ),
+                                    @Parameter(
+                                            name = "size",
+                                            description = "Tamano de pagina",
+                                            required = false,
+                                            schema = @Schema(type = "integer", defaultValue = "10")
+                                    ),
+                                    @Parameter(
+                                            name = "filter",
+                                            description = "Texto para filtrar por nombre o email",
+                                            required = false,
+                                            schema = @Schema(type = "string")
+                                    )
+                            },
+                            responses = {
+                                    @ApiResponse(
+                                            responseCode = "200",
+                                            description = "Listado de solicitudes para revision",
+                                            content = @Content(schema = @Schema(implementation = co.com.pragma.model.requests.Requests.class))
+                                    )
+                            }
+                    )
             )
     })
-
     public RouterFunction<ServerResponse> routerFunction(Handler handler) {
-        return route(POST("/api/loan-request"), handler::createLoanRequest);
+        return route(POST("/api/loan-request"), handler::createLoanRequest)
+                .andRoute(GET("/api/get-requests"), handler::getRequests);
     }
 }

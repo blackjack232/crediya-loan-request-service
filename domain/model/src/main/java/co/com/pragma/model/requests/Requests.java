@@ -19,4 +19,11 @@ public class Requests {
     private String identification;
     private Long id_state;
     private Long id_loan_type;
+    private String customerName;
+    private String loanType;
+    private BigDecimal interestRate;
+    private String status; // "PENDIENTE_REVISION", "RECHAZADA", "REVISION_MANUAL"
+    private BigDecimal baseSalary;
+    private BigDecimal totalMonthlyDebt;
+
 }
