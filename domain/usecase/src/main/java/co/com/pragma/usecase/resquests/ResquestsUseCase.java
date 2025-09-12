@@ -41,9 +41,9 @@ public class ResquestsUseCase {
                     }
 
                     // Paso 2: obtener loanType
-                    return loanTypeRepository.findById(requests.getId_loan_type())
+                    return loanTypeRepository.findById(requests.getIdLoanType())
                             .switchIfEmpty(Mono.error(new IllegalArgumentException(
-                                    "El tipo de prestamo con ID " + requests.getId_loan_type() + " no existe."
+                                    "El tipo de prestamo con ID " + requests.getIdLoanType() + " no existe."
                             )))
                             .flatMap(loanType -> {
                                 // Paso 3: validar monto contra min y max
@@ -62,6 +62,7 @@ public class ResquestsUseCase {
                 });
     }
     public Flux<Requests> execute(int page, int size, String filter) {
+
         //log.info("Obteniendo solicitudes para revisión manual | page={}, size={}, filter={}", page, size, filter);
         return requestsRepository.findRequestsForManualReview(page, size, filter);
                // .doOnComplete(() -> log.info("Listado de solicitudes obtenido correctamente"))

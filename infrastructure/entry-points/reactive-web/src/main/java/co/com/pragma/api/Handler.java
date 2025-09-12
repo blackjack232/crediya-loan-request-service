@@ -67,13 +67,24 @@ public class Handler {
                             .bodyValue(errorResponse);
                 });
     }
-    public Mono<ServerResponse> getRequests(ServerRequest request) {
+    public Mono<ServerResponse> getRequests(ServerRequest serverRequest) {
         // 🔹 Leer parámetros de query
-        int page = request.queryParam("page").map(Integer::parseInt).orElse(0);
-        int size = request.queryParam("size").map(Integer::parseInt).orElse(10);
-        String filter = request.queryParam("filter").orElse(null);
+        int page = serverRequest.queryParam("page").map(Integer::parseInt).orElse(0);
+        int size = serverRequest.queryParam("size").map(Integer::parseInt).orElse(10);
+        String filter = serverRequest.queryParam("filter").orElse(null);
+        String authHeader = serverRequest.headers().firstHeader("Authorization");
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            ApiResponse<Object> errorResponse = ApiResponse.builder()
+                    .message("Token de autorizacion ausente o invalido")
+                    .code(401)
+                    .success(false)
+                    .data(null)
+                    .build();
 
-        //log.info("GET /api/v1/solicitud | page={}, size={}, filter={}", page, size, filter);
+            return ServerResponse.status(HttpStatus.UNAUTHORIZED)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(errorResponse);
+        }
 
         return ServerResponse.ok()
                 .contentType(MediaType.APPLICATION_JSON)

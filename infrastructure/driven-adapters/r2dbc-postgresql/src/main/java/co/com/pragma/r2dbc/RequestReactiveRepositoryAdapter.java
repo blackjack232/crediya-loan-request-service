@@ -33,13 +33,13 @@ public class RequestReactiveRepositoryAdapter implements RequestsRepository {
                 .bind("term", requests.getTerm())
                 .bind("email", requests.getEmail())
                 .bind("id_state", 1)
-                .bind("id_loan_type", requests.getId_loan_type())
+                .bind("id_loan_type", requests.getIdLoanType())
                 .map(row -> requests.toBuilder()
-                        .id_request(row.get("id_request", Long.class))
+                        .idRequest(row.get("id_request", Long.class))
                         .build()
                 )
                 .one()
-                .doOnSuccess(r -> log.info("LoanRequest creado con id={}", r.getId_request()))
+                .doOnSuccess(r -> log.info("LoanRequest creado con id={}", r.getIdRequest()))
                 .doOnError(e -> log.error("Error al insertar LoanRequest: {}", e.getMessage(), e));
 
     }
@@ -53,11 +53,12 @@ public class RequestReactiveRepositoryAdapter implements RequestsRepository {
            r.email,
            s.name AS state,
            lt.name AS loan_type,
-           lt.interest_rate
+           lt.interest_rate,
+           s.name As status
     FROM loan_schema.request r
     JOIN loan_schema.states s ON r.id_state = s.id_state
     JOIN loan_schema.loan_type lt ON r.id_loan_type = lt.id_loan_type
-    WHERE s.name IN ('PENDIENTE_REVISION','RECHAZADA','REVISION_MANUAL')
+    WHERE s.name IN ('Pending')
     AND (:filter IS NULL OR r.email ILIKE '%' || :filter || '%')
     ORDER BY r.id_request DESC
     LIMIT :size OFFSET :offset
@@ -75,16 +76,13 @@ public class RequestReactiveRepositoryAdapter implements RequestsRepository {
         return spec.bind("size", size)
                 .bind("offset", page * size)
                 .map(row -> Requests.builder()
-                        .id_request(row.get("id_request", Long.class))
+                        .idRequest(row.get("id_request", Long.class))
                         .amount(row.get("amount", java.math.BigDecimal.class))
                         .term(row.get("term", Integer.class))
                         .email(row.get("email", String.class))
-                        .customerName(row.get("customer_name", String.class))
                         .loanType(row.get("loan_type", String.class))
                         .interestRate(row.get("interest_rate", java.math.BigDecimal.class))
                         .status(row.get("status", String.class))
-                        .baseSalary(row.get("base_salary", java.math.BigDecimal.class))
-                        .totalMonthlyDebt(row.get("total_monthly_debt", java.math.BigDecimal.class))
                         .build())
                 .all()
                 .doOnSubscribe(sub -> log.info("Ejecutando query para solicitudes pendientes..."))
