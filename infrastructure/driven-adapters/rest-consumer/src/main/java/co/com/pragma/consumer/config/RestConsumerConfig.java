@@ -36,19 +36,7 @@ public class RestConsumerConfig {
     }
 
     private ClientHttpConnector getClientHttpConnector() {
-        /*
-        IF YO REQUIRE APPEND SSL CERTIFICATE SELF SIGNED: this should be in the default cacerts trustore
-        */
-        /*
-        return new ReactorClientHttpConnector(HttpClient.create()
-                .compress(true)
-                .keepAlive(true)
-                .option(CONNECT_TIMEOUT_MILLIS, timeout)
-                .doOnConnected(connection -> {
-                    connection.addHandlerLast(new ReadTimeoutHandler(timeout, MILLISECONDS));
-                    connection.addHandlerLast(new WriteTimeoutHandler(timeout, MILLISECONDS));
-                }));
-                */
+
         return new ReactorClientHttpConnector(
                 HttpClient.create()
                         .compress(true)

@@ -1,14 +1,15 @@
-
 package co.com.pragma.r2dbc;
 
-        import co.com.pragma.model.requests.Requests;
-        import co.com.pragma.model.requests.gateways.RequestsRepository;
-        import lombok.extern.slf4j.Slf4j;
-        import org.springframework.r2dbc.core.DatabaseClient;
-        import org.springframework.stereotype.Repository;
-        import org.springframework.transaction.annotation.Transactional;
-        import reactor.core.publisher.Flux;
-        import reactor.core.publisher.Mono;
+import co.com.pragma.model.requests.Requests;
+import co.com.pragma.model.requests.gateways.RequestsRepository;
+import co.com.pragma.r2dbc.constants.RequestConstants;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.r2dbc.core.DatabaseClient;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+
 @Slf4j
 @Repository
 public class RequestReactiveRepositoryAdapter implements RequestsRepository {
@@ -19,58 +20,66 @@ public class RequestReactiveRepositoryAdapter implements RequestsRepository {
         this.client = client;
     }
 
+    /**
+     * Crea una nueva solicitud de préstamo en la base de datos.
+     *
+     * <p>
+     * Inserta los datos del objeto {@link Requests} en la tabla
+     * <code>loan_schema.request</code>, asignando por defecto el estado inicial
+     * definido en {@link RequestConstants#DEFAULT_STATE_ID}. Una vez insertado,
+     * se devuelve el mismo objeto con el campo <code>idRequest</code>
+     * actualizado con el valor generado por la base de datos.
+     * </p>
+     *
+     * @param requests Objeto con la información del préstamo a registrar.
+     * @return {@link Mono} que emite el objeto {@link Requests} con el id asignado.
+     *         En caso de error se emite una excepción reactiva.
+     */
     @Override
     @Transactional
     public Mono<Requests> createLoanRequest(Requests requests) {
-        log.warn("Insertando LoanRequest en base de datos: {}", requests);
+        log.warn(RequestConstants.LOG_INSERT_REQUEST, requests);
 
-        return client.sql("""
-                        INSERT INTO loan_schema.request (amount, term, email, id_state, id_loan_type)
-                        VALUES (:amount, :term, :email, :id_state, :id_loan_type)
-                        RETURNING id_request
-                        """)
+        return client.sql(RequestConstants.SQL_INSERT_REQUEST)
                 .bind("amount", requests.getAmount())
                 .bind("term", requests.getTerm())
                 .bind("email", requests.getEmail())
-                .bind("id_state", 1)
+                .bind("id_state", RequestConstants.DEFAULT_STATE_ID)
                 .bind("id_loan_type", requests.getIdLoanType())
                 .map(row -> requests.toBuilder()
                         .idRequest(row.get("id_request", Long.class))
-                        .build()
-                )
+                        .build())
                 .one()
-                .doOnSuccess(r -> log.info("LoanRequest creado con id={}", r.getIdRequest()))
-                .doOnError(e -> log.error("Error al insertar LoanRequest: {}", e.getMessage(), e));
-
+                .doOnSuccess(r -> log.info(RequestConstants.LOG_CREATED_REQUEST, r.getIdRequest()))
+                .doOnError(e -> log.error(RequestConstants.LOG_INSERT_ERROR, e.getMessage(), e));
     }
 
+    /**
+     * Consulta las solicitudes de préstamo que están pendientes de revisión manual.
+     *
+     * <p>
+     * Este método construye dinámicamente un query SQL que busca registros en
+     * <code>loan_schema.request</code> cuyo estado corresponda a
+     * {@link RequestConstants#PENDING_STATUS}. Adicionalmente, permite aplicar un
+     * filtro opcional sobre el correo del solicitante. El resultado se devuelve de
+     * manera paginada usando los parámetros <code>page</code> y <code>size</code>.
+     * </p>
+     *
+     * @param page   Número de página (comenzando desde 0).
+     * @param size   Tamaño de página, es decir, cantidad de registros a recuperar.
+     * @param filter Texto opcional para filtrar por coincidencia parcial en el
+     *               correo electrónico.
+     * @return {@link Flux} que emite múltiples instancias de {@link Requests}. Si
+     *         no hay resultados, el flujo estará vacío.
+     */
     @Override
     public Flux<Requests> findRequestsForManualReview(int page, int size, String filter) {
-        String sql = """
-    SELECT r.id_request,
-           r.amount,
-           r.term,
-           r.email,
-           s.name AS state,
-           lt.name AS loan_type,
-           lt.interest_rate,
-           s.name As status
-    FROM loan_schema.request r
-    JOIN loan_schema.states s ON r.id_state = s.id_state
-    JOIN loan_schema.loan_type lt ON r.id_loan_type = lt.id_loan_type
-    WHERE s.name IN ('Pending')
-    AND (:filter IS NULL OR r.email ILIKE '%' || :filter || '%')
-    ORDER BY r.id_request DESC
-    LIMIT :size OFFSET :offset
-    """;
-
-
-        var spec = client.sql(sql);
+        var spec = client.sql(RequestConstants.SQL_FIND_REQUESTS_FOR_MANUAL_REVIEW);
 
         if (filter != null && !filter.isBlank()) {
             spec = spec.bind("filter", filter);
         } else {
-            spec = spec.bindNull("filter", String.class); // 👈 aquí está la clave
+            spec = spec.bindNull("filter", String.class);
         }
 
         return spec.bind("size", size)
@@ -85,9 +94,7 @@ public class RequestReactiveRepositoryAdapter implements RequestsRepository {
                         .status(row.get("status", String.class))
                         .build())
                 .all()
-                .doOnSubscribe(sub -> log.info("Ejecutando query para solicitudes pendientes..."))
-                .doOnError(e -> log.error("Error consultando solicitudes: {}", e.getMessage(), e));
+                .doOnSubscribe(sub -> log.info(RequestConstants.LOG_QUERY_EXECUTION))
+                .doOnError(e -> log.error(RequestConstants.LOG_QUERY_ERROR, e.getMessage(), e));
     }
-
-
 }

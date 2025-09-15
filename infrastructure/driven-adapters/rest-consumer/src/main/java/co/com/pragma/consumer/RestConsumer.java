@@ -31,27 +31,4 @@ public class RestConsumer implements UserGateway {
                 });
     }
 
-
-// Possible fallback method
-//    public Mono<String> testGetOk(Exception ignored) {
-//        return client
-//                .get() // TODO: change for another endpoint or destination
-//                .retrieve()
-//                .bodyToMono(String.class);
-//    }
-/*
-    @CircuitBreaker(name = "testPost")
-    public Mono<ObjectResponse> testPost() {
-        ObjectRequest request = ObjectRequest.builder()
-            .val1("exampleval1")
-            .val2("exampleval2")
-            .build();
-        return client
-                .post()
-                .body(Mono.just(request), ObjectRequest.class)
-                .retrieve()
-                .bodyToMono(ObjectResponse.class);
-    }
-
- */
 }
