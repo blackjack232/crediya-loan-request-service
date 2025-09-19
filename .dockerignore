@@ -1,0 +1,17 @@
+# Gradle y build cache
+.gradle
+build
+
+# Archivos de IDE
+.idea
+*.iml
+*.ipr
+*.iws
+
+# Sistema
+.DS_Store
+.git
+.gitignore
+
+# Otros
+node_modules

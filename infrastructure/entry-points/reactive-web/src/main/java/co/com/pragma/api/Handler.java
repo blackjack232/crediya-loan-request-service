@@ -1,13 +1,16 @@
 package co.com.pragma.api;
 
 import co.com.pragma.api.dto.request.LoanRequest;
+import co.com.pragma.api.dto.request.UpdateLoanStatusRequest;
 import co.com.pragma.api.dto.response.LoanResponse;
 import co.com.pragma.api.mapper.LoanRequestMapper;
 import co.com.pragma.api.mapper.LoanResponseMapper;
+import co.com.pragma.api.mapper.UpdateLoanStatusMapper;
 import co.com.pragma.api.util.ResponseBuilder;
 import co.com.pragma.model.requests.Requests;
 import co.com.pragma.model.requests.constants.HttpCode;
 import co.com.pragma.model.requests.constants.RequestsLoanConstants;
+import co.com.pragma.model.requests.constants.UnauthorizedUserException;
 import co.com.pragma.usecase.resquests.ResquestsUseCase;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
@@ -23,6 +26,7 @@ public class Handler {
     private final ResquestsUseCase resquestsUseCase;
     private final LoanRequestMapper loanRequestMapper;
     private final LoanResponseMapper loanResponseMapper;
+    private final UpdateLoanStatusMapper updateLoanStatusMapper;
 
     /**
      * Endpoint encargado de crear una nueva solicitud de préstamo.
@@ -90,6 +94,7 @@ public class Handler {
         int page = serverRequest.queryParam("page").map(Integer::parseInt).orElse(0);
         int size = serverRequest.queryParam("size").map(Integer::parseInt).orElse(10);
         String filter = serverRequest.queryParam("filter").orElse(null);
+        String identification = serverRequest.queryParam("identification").orElse(null);
 
         String authHeader = serverRequest.headers()
                 .firstHeader(RequestsLoanConstants.AUTHORIZATION_HEADER);
@@ -103,10 +108,67 @@ public class Handler {
 
         return ServerResponse.ok()
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(resquestsUseCase.execute(page, size, filter), Requests.class)
+                .body(
+                        resquestsUseCase.execute(page, size, filter, identification, authHeader)
+                                .map(loanResponseMapper::toResponse),
+                        LoanResponse.class
+                )
+                .onErrorResume(UnauthorizedUserException.class, ex -> {
+
+                    return ResponseBuilder.error(
+                            ex.getMessage(),
+                            HttpCode.FORBIDDEN.getValue() // 403
+                    );
+                })
+                .onErrorResume(e -> {
+
+                    return ResponseBuilder.error(
+                            RequestsLoanConstants.ERROR_PROCESSING_REQUEST,
+                            HttpCode.BAD_REQUEST.getValue()
+                    );
+                });
+    }
+    /**
+     * Endpoint encargado de actualizar el estado de una solicitud de préstamo.
+     *
+     * <p>Flujo principal:
+     * <ul>
+     *   <li>Extrae el token JWT del encabezado {@code Authorization}.</li>
+     *   <li>Valida el formato del token (prefijo {@code Bearer }).</li>
+     *   <li>Convierte el cuerpo JSON en {@link UpdateLoanStatusRequest} y lo mapea al dominio.</li>
+     *   <li>Ejecuta el caso de uso {@link ResquestsUseCase#updateLoanStatus}.</li>
+     *   <li>Construye la respuesta estándar de éxito con {@link ResponseBuilder}.</li>
+     * </ul>
+     *
+     * <p>Errores controlados:
+     * <ul>
+     *   <li>Token ausente o inválido → {@code 401 Unauthorized}.</li>
+     *   <li>Error en validaciones del caso de uso → {@code 400 Bad Request}.</li>
+     * </ul>
+     */
+    public Mono<ServerResponse> updateLoanStatus(ServerRequest serverRequest) {
+        String authHeader = serverRequest.headers()
+                .firstHeader(RequestsLoanConstants.AUTHORIZATION_HEADER);
+
+        if (authHeader == null || !authHeader.startsWith(RequestsLoanConstants.BEARER_PREFIX)) {
+            return ResponseBuilder.error(
+                    RequestsLoanConstants.TOKEN_MISSING_OR_INVALID,
+                    HttpCode.UNAUTHORIZED.getValue()
+            );
+        }
+
+        return serverRequest.bodyToMono(UpdateLoanStatusRequest.class)
+                .map(updateLoanStatusMapper::toDomain)  // 👈 mapeamos aquí
+                .flatMap(request -> resquestsUseCase.updateLoanStatus(request, authHeader))
+                .flatMap(result -> ResponseBuilder.success(
+                        result,
+                        RequestsLoanConstants.UPDATE_STATE_LOAN_REQUEST_SUCCESS,
+                        HttpCode.OK.getValue()
+                ))
                 .onErrorResume(e -> ResponseBuilder.error(
-                        RequestsLoanConstants.ERROR_PROCESSING_REQUEST,
+                        RequestsLoanConstants.GENERIC_ERROR_PREFIX + e.getMessage(),
                         HttpCode.BAD_REQUEST.getValue()
                 ));
     }
+
 }

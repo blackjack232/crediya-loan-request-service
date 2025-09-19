@@ -7,4 +7,5 @@ import reactor.core.publisher.Mono;
 public interface RequestsRepository {
     Mono<Requests> createLoanRequest(Requests requests);
     Flux<Requests> findRequestsForManualReview(int page, int size, String filter);
+    Mono<Requests> updateLoanStatus(Requests request)
 }

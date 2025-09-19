@@ -38,14 +38,13 @@ public final class RequestConstants {
                    r.amount,
                    r.term,
                    r.email,
-                   s.name AS state,
+                   s.name AS status,
                    lt.name AS loan_type,
-                   lt.interest_rate,
-                   s.name AS status
+                   lt.interest_rate
             FROM loan_schema.request r
             JOIN loan_schema.states s ON r.id_state = s.id_state
             JOIN loan_schema.loan_type lt ON r.id_loan_type = lt.id_loan_type
-            WHERE s.name IN ('Pending')
+            WHERE  s.name IN ('En espera')
             AND (:filter IS NULL OR r.email ILIKE '%' || :filter || '%')
             ORDER BY r.id_request DESC
             LIMIT :size OFFSET :offset

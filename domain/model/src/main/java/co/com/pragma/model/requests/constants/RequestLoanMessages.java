@@ -28,4 +28,15 @@ public final class RequestLoanMessages {
     // Mensajes de logs o errores generales
     public static final String ERROR_FETCHING_REQUESTS = "Error al obtener solicitudes: %s";
     public static final String REQUESTS_FETCHED_OK = "Listado de solicitudes obtenido correctamente";
+    public static final String USER_NOT_FOUND_OR_UNAUTHORIZED_ROLE =
+            "Usuario no encontrado o rol no autorizado para realizar esta operación.";
+
+    public static final String INVALID_STATUS = "Estado invalido";
+
+
+    public static final String USER_NOT_AUTHORIZED = "El usuario no tiene rol de asesor.";
+
+
+
+
 }

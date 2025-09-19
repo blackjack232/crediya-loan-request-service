@@ -97,4 +97,63 @@ public class RequestReactiveRepositoryAdapter implements RequestsRepository {
                 .doOnSubscribe(sub -> log.info(RequestConstants.LOG_QUERY_EXECUTION))
                 .doOnError(e -> log.error(RequestConstants.LOG_QUERY_ERROR, e.getMessage(), e));
     }
+    /**
+     * Actualiza el estado (id_state) de una solicitud de préstamo en la base de datos.
+     *
+     * <p>Responsabilidades:
+     * <ul>
+     *   <li>Ejecutar la sentencia SQL que actualiza el campo {@code id_state} para el registro con el ID proporcionado.</li>
+     *   <li>Devolver los datos actualizados de la solicitud como un objeto {@link Requests}.</li>
+     *   <li>Registrar en logs el resultado de la operación (éxito, no encontrado, error).</li>
+     * </ul>
+     *
+     * <p>Flujos alternativos:
+     * <ul>
+     *   <li>Si no se encuentra la solicitud con el ID dado, se emite {@code Mono.empty()}.</li>
+     *   <li>Si ocurre un error en la ejecución de la consulta, se emite un {@link Mono#error(Throwable)}.</li>
+     * </ul>
+     *
+     * @param requests Objeto que contiene el ID de la solicitud y el nuevo estado {@code idState}.
+     * @return {@link Mono} que emite la solicitud actualizada si fue encontrada, o vacío si no existe.
+     */
+    @Override
+    @Transactional
+    public Mono<Requests> updateLoanStatus(Requests requests) {
+        Long idRequest = requests.getIdRequest();
+        Long idState = requests.getIdState();
+
+        log.info("🔄 Actualizando estado de la solicitud con id={} a id_state={}", idRequest, idState);
+
+        String sql = """
+        UPDATE loan_schema.request
+        SET id_state = :id_state
+        WHERE id_request = :id_request
+        RETURNING id_request, amount, term, email, id_state, status
+        """;
+
+        return client.sql(sql)
+                .bind("id_state", idState)
+                .bind("id_request", idRequest)
+                .map(row -> Requests.builder()
+                        .idRequest(row.get("id_request", Long.class))
+                        .amount(row.get("amount", java.math.BigDecimal.class))
+                        .term(row.get("term", Integer.class))
+                        .email(row.get("email", String.class))
+                        .idState(row.get("id_state", Long.class))
+                        .status(row.get("status", String.class))
+                        .build())
+                .one()
+                .doOnSuccess(r -> {
+                    if (r != null) {
+                        log.info("✅ Estado actualizado correctamente. id={}, nuevo id_state={}, nuevo status={}",
+                                r.getIdRequest(), r.getIdState(), r.getStatus());
+                    } else {
+                        log.warn("⚠️ No se encontró ninguna solicitud con id={} para actualizar.", idRequest);
+                    }
+                })
+                .doOnError(e -> log.error("❌ Error al actualizar el estado de la solicitud con id={}: {}",
+                        idRequest, e.getMessage(), e));
+    }
+
+
 }

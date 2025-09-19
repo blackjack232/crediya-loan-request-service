@@ -16,6 +16,8 @@ public class RequestsLoanConstants {
 
     // Mensajes de éxito
     public static final String LOAN_CREATED_SUCCESS = "Solicitud de préstamo creada exitosamente";
+    public static final String UPDATE_STATE_LOAN_REQUEST_SUCCESS = "Estado de la solicitud actualizado correctamente";
+    public static final String IDENTIFICATION_MISSING = " Ingrese numero de identificacion";
     public static final Pattern EMAIL_PATTERN =
             Pattern.compile("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$");
 

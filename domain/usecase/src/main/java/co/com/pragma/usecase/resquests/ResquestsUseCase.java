@@ -4,6 +4,7 @@ import co.com.pragma.model.loantype.gateways.LoanTypeRepository;
 import co.com.pragma.model.requests.Requests;
 import co.com.pragma.model.requests.constants.RequestLoanMessages;
 import co.com.pragma.model.requests.constants.RequestsLoanConstants;
+import co.com.pragma.model.requests.constants.UnauthorizedUserException;
 import co.com.pragma.model.requests.gateways.RequestsRepository;
 import co.com.pragma.model.user.gateways.UserGateway;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +18,7 @@ public class ResquestsUseCase {
     private final RequestsRepository requestsRepository;
     private final UserGateway userGateway;
     private final LoanTypeRepository loanTypeRepository;
+    /*private final SqsGateway sqsGateway; // 👈 agrega esta dependencia (gateway a SQS)*/
 
 
     /**
@@ -125,22 +127,109 @@ public class ResquestsUseCase {
      * <p>Flujo principal:
      * <ul>
      *   <li>Recibe los parámetros de paginación: página, tamaño y un filtro opcional.</li>
+     *   <li>Verifica que el usuario exista y tenga un rol válido mediante {@link UserGateway}.</li>
      *   <li>Delegamos la consulta al {@link RequestsRepository} que devuelve un {@link Flux} de solicitudes.</li>
      *   <li>Permite procesar los resultados de manera reactiva, ideal para grandes volúmenes de datos.</li>
      * </ul>
      *
      * <p>Flujos alternativos (errores):
      * <ul>
+     *   <li>Si el usuario no existe o su rol no está autorizado, se emite un error con mensaje
+     *       {@code USER_NOT_FOUND_OR_UNAUTHORIZED_ROLE}.</li>
      *   <li>Si ocurre un error en la consulta a la base de datos, el {@link Flux} emite un error con mensaje
      *       {@code ERROR_FETCHING_REQUESTS}.</li>
      * </ul>
      *
-     * @param page   Número de página a consultar (por defecto 0).
-     * @param size   Cantidad de registros por página (por defecto 10).
-     * @param filter Filtro opcional aplicado a los resultados.
+     * @param page           Número de página a consultar (por defecto 0).
+     * @param size           Cantidad de registros por página (por defecto 10).
+     * @param filter         Filtro opcional aplicado a los resultados.
+     * @param identification Número de identificación del usuario solicitante.
      * @return {@link Flux} que emite la lista de {@link Requests}, o un error si ocurre un problema.
      */
-    public Flux<Requests> execute(int page, int size, String filter) {
-        return requestsRepository.findRequestsForManualReview(page, size, filter);
+    /**
+     * Obtiene un listado paginado de solicitudes de préstamo que requieren revisión manual.
+     *
+     * <p>Flujo principal:
+     * <ul>
+     *   <li>Verifica que el usuario exista y tenga rol autorizado mediante {@link UserGateway}.</li>
+     *   <li>Si es autorizado, delega la consulta al {@link RequestsRepository} que devuelve un {@link Flux} de solicitudes.</li>
+     * </ul>
+     *
+     * <p>Flujos alternativos (errores):
+     * <ul>
+     *   <li>Si el usuario no está autorizado, se emite un error con mensaje {@code USER_NOT_AUTHORIZED}.</li>
+     *   <li>Si ocurre un error en la consulta, el error se propagará automáticamente.</li>
+     * </ul>
+     *
+     * @param page           Número de página a consultar (por defecto 0).
+     * @param size           Cantidad de registros por página (por defecto 10).
+     * @param filter         Filtro opcional aplicado a los resultados.
+     * @param identification Número de identificación del usuario solicitante.
+     * @param authHeader     Token de autorización.
+     * @return {@link Flux} que emite la lista de {@link Requests}, o un error si el usuario no está autorizado o falla la consulta.
+     */
+    public Flux<Requests> execute(int page, int size, String filter, String identification, String authHeader) {
+        return userGateway.verifyRole(identification, authHeader)
+                .flatMapMany(roleExists -> {
+                    if (Boolean.FALSE.equals(roleExists)) {
+
+                        return Flux.error(new UnauthorizedUserException(RequestLoanMessages.USER_NOT_AUTHORIZED));
+                    }
+                    return requestsRepository.findRequestsForManualReview(page, size, filter);
+                });
     }
+
+    /**
+     * Caso de uso: Actualiza el estado de una solicitud de préstamo existente.
+     *
+     * <p>Responsabilidades de este método:
+     * <ul>
+     *   <li>Validar que el objeto {@link Requests} contenga los datos mínimos requeridos
+     *       ({@code idRequest}, {@code idState} y {@code identification}).</li>
+     *   <li>Validar la presencia y formato correcto del token de autorización
+     *       (prefijo {@code Bearer }).</li>
+     *   <li>Verificar que el usuario que realiza la operación tenga el rol de
+     *       "Asesor" mediante {@link userGateway#verifyRole}.</li>
+     *   <li>Delegar al repositorio la actualización del estado de la solicitud.</li>
+     *   <li>Propagar la solicitud actualizada como resultado del flujo reactivo.</li>
+     * </ul>
+     *
+     * <p>Flujos de error esperados:
+     * <ul>
+     *   <li>Si faltan datos obligatorios → {@link IllegalArgumentException}.</li>
+     *   <li>Si el token es nulo o inválido → {@link SecurityException}.</li>
+     *   <li>Si el usuario no tiene permisos para actualizar → {@link SecurityException}.</li>
+     *   <li>Si el repositorio falla → error propagado en el flujo {@link Mono#error(Throwable)}.</li>
+     * </ul>
+     *
+     * @param request    Objeto de dominio con datos de la solicitud a actualizar
+     *                   (incluye ID, nuevo estado e identificación del usuario).
+     * @param authHeader Token JWT de autorización con prefijo {@code Bearer }.
+     * @return {@link Mono} que emite la solicitud actualizada si todo es exitoso,
+     *         o un error si alguna validación falla o ocurre un problema en la actualización.
+     */
+    public Mono<Requests> updateLoanStatus(Requests request, String authHeader) {
+        // ✅ Validaciones centralizadas
+        if (request.getIdRequest() == null || request.getIdState() == null) {
+            return Mono.error(new IllegalArgumentException("Id de solicitud o estado inválido"));
+        }
+        if (request.getIdentification() == null || request.getIdentification().isBlank()) {
+            return Mono.error(new IllegalArgumentException("Identificación requerida"));
+        }
+        if (authHeader == null || !authHeader.startsWith(RequestsLoanConstants.BEARER_PREFIX)) {
+            return Mono.error(new SecurityException("Token ausente o inválido"));
+        }
+
+        return userGateway.verifyRole(request.getIdentification(), authHeader)
+                .flatMap(isAuthorized -> {
+                    if (!isAuthorized) {
+                        return Mono.error(new SecurityException("Usuario no autorizado"));
+                    }
+
+                    // 👇 Llamamos al repositorio para actualizar el estado
+                    return requestsRepository.updateLoanStatus(request);
+                });
+    }
+
+
 }

@@ -15,11 +15,17 @@ spring:
     api-docs:
       path: "/api-docs"
   r2dbc:
-    host: "localhost"
+   # host: "postgres"
+   # port: 5432
+    #username: "loan_user"
+   # password: 123456789
+    #database: "loan_system"
+    #schema: "loan_schema"
+    host: "postgres"
     port: 5432
-    username: "loan_user"
-    password: 123456789
-    database: "loan_system"
+    username: "auth_user"
+    password: pass12345
+    database: "authentication_db"
     schema: "loan_schema"
   profiles:
     include: null
@@ -40,7 +46,11 @@ cors:
 adapter:
   restconsumer:
     timeout: 5000
-    url: "http://localhost:8090"
+    url: "http://autenticacion:8090"
+    endpoints:
+      exists-user: /api/users/{identification}
+
+
 resilience4j:
   circuitbreaker:
     instances:
