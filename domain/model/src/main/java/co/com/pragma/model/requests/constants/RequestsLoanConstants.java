@@ -18,6 +18,15 @@ public class RequestsLoanConstants {
     public static final String LOAN_CREATED_SUCCESS = "Solicitud de préstamo creada exitosamente";
     public static final String UPDATE_STATE_LOAN_REQUEST_SUCCESS = "Estado de la solicitud actualizado correctamente";
     public static final String IDENTIFICATION_MISSING = " Ingrese numero de identificacion";
+    public static final String CAPACITY_CALCULATION_SUCCESS =
+            "Capacidad de endeudamiento calculada correctamente";
+    public static final String SQS_MESSAGE_TEMPLATE = """
+            {
+              "idSolicitud": %d,
+              "estado": "%s",
+              "monto": %.2f
+            }
+            """;
     public static final Pattern EMAIL_PATTERN =
             Pattern.compile("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$");
 

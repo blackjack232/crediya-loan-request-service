@@ -23,5 +23,6 @@ public class Requests {
     private BigDecimal interestRate;
     private String status; // "PENDIENTE_REVISION", "RECHAZADA", "REVISION_MANUAL"
     private BigDecimal totalMonthlyDebt;
+    private BigDecimal income;
 
 }

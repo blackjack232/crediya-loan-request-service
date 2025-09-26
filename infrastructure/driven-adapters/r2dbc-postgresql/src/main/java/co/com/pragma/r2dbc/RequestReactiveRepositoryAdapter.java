@@ -10,6 +10,8 @@ import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.math.BigDecimal;
+
 @Slf4j
 @Repository
 public class RequestReactiveRepositoryAdapter implements RequestsRepository {
@@ -100,18 +102,10 @@ public class RequestReactiveRepositoryAdapter implements RequestsRepository {
     /**
      * Actualiza el estado (id_state) de una solicitud de préstamo en la base de datos.
      *
-     * <p>Responsabilidades:
-     * <ul>
-     *   <li>Ejecutar la sentencia SQL que actualiza el campo {@code id_state} para el registro con el ID proporcionado.</li>
-     *   <li>Devolver los datos actualizados de la solicitud como un objeto {@link Requests}.</li>
-     *   <li>Registrar en logs el resultado de la operación (éxito, no encontrado, error).</li>
-     * </ul>
-     *
-     * <p>Flujos alternativos:
-     * <ul>
-     *   <li>Si no se encuentra la solicitud con el ID dado, se emite {@code Mono.empty()}.</li>
-     *   <li>Si ocurre un error en la ejecución de la consulta, se emite un {@link Mono#error(Throwable)}.</li>
-     * </ul>
+     * <p>
+     * Esta versión usa RETURNING con un JOIN a la tabla state para devolver
+     * el nombre legible del estado en un solo roundtrip a la base de datos.
+     * </p>
      *
      * @param requests Objeto que contiene el ID de la solicitud y el nuevo estado {@code idState}.
      * @return {@link Mono} que emite la solicitud actualizada si fue encontrada, o vacío si no existe.
@@ -122,16 +116,9 @@ public class RequestReactiveRepositoryAdapter implements RequestsRepository {
         Long idRequest = requests.getIdRequest();
         Long idState = requests.getIdState();
 
-        log.info("🔄 Actualizando estado de la solicitud con id={} a id_state={}", idRequest, idState);
+        log.info(RequestConstants.LOG_UPDATE_STATUS, idRequest, idState);
 
-        String sql = """
-        UPDATE loan_schema.request
-        SET id_state = :id_state
-        WHERE id_request = :id_request
-        RETURNING id_request, amount, term, email, id_state, status
-        """;
-
-        return client.sql(sql)
+        return client.sql(RequestConstants.SQL_UPDATE_LOAN_STATUS)
                 .bind("id_state", idState)
                 .bind("id_request", idRequest)
                 .map(row -> Requests.builder()
@@ -140,19 +127,38 @@ public class RequestReactiveRepositoryAdapter implements RequestsRepository {
                         .term(row.get("term", Integer.class))
                         .email(row.get("email", String.class))
                         .idState(row.get("id_state", Long.class))
-                        .status(row.get("status", String.class))
+                        .status(row.get("state_name", String.class)) // ✅ Ahora trae el nombre del estado
                         .build())
                 .one()
                 .doOnSuccess(r -> {
                     if (r != null) {
-                        log.info("✅ Estado actualizado correctamente. id={}, nuevo id_state={}, nuevo status={}",
+                        log.info(RequestConstants.LOG_UPDATE_SUCCESS,
                                 r.getIdRequest(), r.getIdState(), r.getStatus());
                     } else {
-                        log.warn("⚠️ No se encontró ninguna solicitud con id={} para actualizar.", idRequest);
+                        log.warn(RequestConstants.LOG_UPDATE_NOT_FOUND, idRequest);
                     }
                 })
-                .doOnError(e -> log.error("❌ Error al actualizar el estado de la solicitud con id={}: {}",
-                        idRequest, e.getMessage(), e));
+                .doOnError(e -> log.error(RequestConstants.LOG_UPDATE_ERROR, idRequest, e.getMessage(), e));
+    }
+
+
+    @Override
+    public Flux<Requests> findApprovedLoansByUser(String email) {
+        return client.sql(RequestConstants.SQL_FIND_APPROVED_LOANS_BY_EMAIL)
+                .bind("email", email)
+                .map(row -> Requests.builder()
+                        .idRequest(row.get("id_request", Long.class))
+                        .amount(row.get("amount", BigDecimal.class))
+                        .term(row.get("term", Integer.class))
+                        .interestRate(row.get("interest_rate", BigDecimal.class))
+                        .build())
+                .all()
+                .doOnNext(request -> log.info("Solicitud encontrada: id={}, amount={}, term={}, interestRate={}",
+                        request.getIdRequest(),
+                        request.getAmount(),
+                        request.getTerm(),
+                        request.getInterestRate()
+                ));
     }
 
 

@@ -68,7 +68,7 @@ public class LoanReactiveRepositoryAdapter implements LoanTypeRepository {
                         .name(row.get("name", String.class))
                         .minAmount(row.get("minimum_amount", BigDecimal.class))
                         .maxAmount(row.get("maximum_amount", BigDecimal.class))
-                        .interestRate(row.get("interest_rate", Double.class))
+                        .interestRate(row.get("interest_rate", BigDecimal.class))
                         .automaticValidation(row.get("automatic_validation", Boolean.class))
                         .build()
                 )

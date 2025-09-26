@@ -1,11 +1,10 @@
 package co.com.pragma.api;
 
+import co.com.pragma.api.dto.request.CapacityTranslatorLoanRequest;
 import co.com.pragma.api.dto.request.LoanRequest;
 import co.com.pragma.api.dto.request.UpdateLoanStatusRequest;
 import co.com.pragma.api.dto.response.LoanResponse;
-import co.com.pragma.api.mapper.LoanRequestMapper;
-import co.com.pragma.api.mapper.LoanResponseMapper;
-import co.com.pragma.api.mapper.UpdateLoanStatusMapper;
+import co.com.pragma.api.mapper.*;
 import co.com.pragma.api.util.ResponseBuilder;
 import co.com.pragma.model.requests.Requests;
 import co.com.pragma.model.requests.constants.HttpCode;
@@ -25,8 +24,10 @@ public class Handler {
 
     private final ResquestsUseCase resquestsUseCase;
     private final LoanRequestMapper loanRequestMapper;
+    private final CapacityTranslatorLoanRequestMapper capacityTranslatorLoanRequestMapper;
     private final LoanResponseMapper loanResponseMapper;
     private final UpdateLoanStatusMapper updateLoanStatusMapper;
+    private final UpdateLoanStatusResponseMapper updateLoanStatusResponseMapper;
 
     /**
      * Endpoint encargado de crear una nueva solicitud de préstamo.
@@ -128,6 +129,7 @@ public class Handler {
                     );
                 });
     }
+
     /**
      * Endpoint encargado de actualizar el estado de una solicitud de préstamo.
      *
@@ -160,6 +162,7 @@ public class Handler {
         return serverRequest.bodyToMono(UpdateLoanStatusRequest.class)
                 .map(updateLoanStatusMapper::toDomain)  // 👈 mapeamos aquí
                 .flatMap(request -> resquestsUseCase.updateLoanStatus(request, authHeader))
+                .map(updateLoanStatusResponseMapper::toResponse)
                 .flatMap(result -> ResponseBuilder.success(
                         result,
                         RequestsLoanConstants.UPDATE_STATE_LOAN_REQUEST_SUCCESS,
@@ -170,5 +173,57 @@ public class Handler {
                         HttpCode.BAD_REQUEST.getValue()
                 ));
     }
+
+    /**
+     * Endpoint to calculate the applicant's available borrowing capacity.
+     *
+     * <p>Main flow:
+     * <ul>
+     *   <li>Validates JWT token from {@code Authorization} header.</li>
+     *   <li>Reads request body and maps it to domain model.</li>
+     *   <li>Calls use case {@link ResquestsUseCase#calculateBorrowingCapacity}.</li>
+     *   <li>Returns decision (APPROVED, REJECTED, MANUAL_REVIEW) in the response.</li>
+     * </ul>
+     *
+     * <p>Error handling:
+     * <ul>
+     *   <li>Invalid token → {@code 401 Unauthorized}.</li>
+     *   <li>Validation errors → {@code 400 Bad Request}.</li>
+     * </ul>
+     */
+    public Mono<ServerResponse> calculateCapacity(ServerRequest serverRequest) {
+        String authHeader = serverRequest.headers()
+                .firstHeader(RequestsLoanConstants.AUTHORIZATION_HEADER);
+
+        if (authHeader == null || !authHeader.startsWith(RequestsLoanConstants.BEARER_PREFIX)) {
+            return ResponseBuilder.error(
+                    RequestsLoanConstants.TOKEN_MISSING_OR_INVALID,
+                    HttpCode.UNAUTHORIZED.getValue()
+            );
+        }
+
+        return serverRequest.bodyToMono(CapacityTranslatorLoanRequest.class)
+                .map(capacityTranslatorLoanRequestMapper::toDomain)
+                .flatMap(request ->
+                        resquestsUseCase.calculateBorrowingCapacity(request, authHeader)
+                                .flatMap(result ->
+                                        resquestsUseCase.processBorrowingCapacityAndNotify(request, result)
+                                                .then(ResponseBuilder.success(
+                                                        result,
+                                                        RequestsLoanConstants.CAPACITY_CALCULATION_SUCCESS,
+                                                        HttpCode.OK.getValue()
+                                                ))
+                                )
+                )
+                .onErrorResume(e ->
+                        ResponseBuilder.error(
+                                RequestsLoanConstants.GENERIC_ERROR_PREFIX + e.getMessage(),
+                                HttpCode.BAD_REQUEST.getValue()
+                        )
+                );
+    }
+
+
+
 
 }

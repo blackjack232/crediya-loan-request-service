@@ -15,16 +15,10 @@ spring:
     api-docs:
       path: "/api-docs"
   r2dbc:
-   # host: "postgres"
-   # port: 5432
-    #username: "loan_user"
-   # password: 123456789
-    #database: "loan_system"
-    #schema: "loan_schema"
     host: "postgres"
     port: 5432
     username: "auth_user"
-    password: pass12345
+    password: "pass12345"
     database: "authentication_db"
     schema: "loan_schema"
   profiles:

@@ -1,3 +1,9 @@
 dependencies {
     implementation project(':model')
+    // --- Dependencias de test con JUnit 4 ---
+    testImplementation 'junit:junit:4.13.2'
+
+    // Mockito para mocks
+    testImplementation 'org.mockito:mockito-core:5.12.0'
+
 }

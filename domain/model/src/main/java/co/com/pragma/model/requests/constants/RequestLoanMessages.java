@@ -35,7 +35,10 @@ public final class RequestLoanMessages {
 
 
     public static final String USER_NOT_AUTHORIZED = "El usuario no tiene rol de asesor.";
-
+    public static final String INVALID_REQUEST_OR_STATE = "Id de solicitud o estado inválido";
+    public static final String IDENTIFICATION_REQUIRED = "Identificación requerida";
+    public static final String TOKEN_MISSING_OR_INVALID = "Token ausente o inválido";
+    public static final String REQUEST_NOT_FOUND = "No se encontró la solicitud para actualizar";
 
 
 

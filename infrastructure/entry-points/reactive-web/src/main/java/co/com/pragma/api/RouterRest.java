@@ -1,7 +1,10 @@
 package co.com.pragma.api;
 
+import co.com.pragma.api.dto.request.CapacityTranslatorLoanRequest;
 import co.com.pragma.api.dto.request.LoanRequest;
 import co.com.pragma.api.dto.request.UpdateLoanStatusRequest;
+import co.com.pragma.api.mapper.CapacityTranslatorLoanRequestMapper;
+import co.com.pragma.model.loandecisionresult.LoanDecisionResult;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -20,8 +23,11 @@ import org.springframework.web.reactive.function.server.ServerResponse;
 import static org.springframework.web.reactive.function.server.RequestPredicates.*;
 import static org.springframework.web.reactive.function.server.RouterFunctions.route;
 
+
+
 @Configuration
 public class RouterRest {
+
     @Bean
     @RouterOperations({
             @RouterOperation(
@@ -32,7 +38,7 @@ public class RouterRest {
                     beanMethod = "createLoanRequest",
                     operation = @Operation(
                             operationId = "createLoanRequest",
-                            summary = "Create a new loan request",
+                            summary = "Crear una nueva solicitud de préstamo",
                             requestBody = @RequestBody(
                                     required = true,
                                     content = @Content(
@@ -42,8 +48,8 @@ public class RouterRest {
                             ),
                             responses = {
                                     @ApiResponse(
-                                            responseCode = "200",
-                                            description = "Loan created successfully",
+                                            responseCode = "201",
+                                            description = "Solicitud creada correctamente",
                                             content = @Content(schema = @Schema(implementation = LoanRequest.class))
                                     )
                             }
@@ -57,72 +63,42 @@ public class RouterRest {
                     beanMethod = "getRequests",
                     operation = @Operation(
                             operationId = "getRequests",
-                            summary = "Obtener listado de solicitudes para revision manual",
+                            summary = "Obtener listado de solicitudes para revisión manual",
                             parameters = {
                                     @Parameter(
                                             name = "identification",
-                                            description = "Numero de identificacion",
+                                            description = "Número de identificación",
                                             required = true,
-                                            schema = @Schema(type = "string", defaultValue = "0")
+                                            schema = @Schema(type = "string")
                                     ),
                                     @Parameter(
                                             name = "page",
-                                            description = "Numero de pagina",
-                                            required = false,
+                                            description = "Número de página",
                                             schema = @Schema(type = "integer", defaultValue = "0")
                                     ),
                                     @Parameter(
                                             name = "size",
-                                            description = "Tamano de pagina",
-                                            required = false,
+                                            description = "Tamaño de página",
                                             schema = @Schema(type = "integer", defaultValue = "10")
                                     ),
                                     @Parameter(
                                             name = "filter",
-                                            description = "Texto para filtrar por nombre o email",
-                                            required = false,
+                                            description = "Filtro por email o nombre",
                                             schema = @Schema(type = "string")
-                                    )
-                            },
-                            responses = {
-                                    @ApiResponse(
-                                            responseCode = "200",
-                                            description = "Listado de solicitudes para revision",
-                                            content = @Content(schema = @Schema(implementation = co.com.pragma.model.requests.Requests.class))
                                     )
                             }
                     )
             ),
             @RouterOperation(
-                    path = "/api/loan-request/state/{id}",
+                    path = "/api/loan-request/state",
                     produces = {MediaType.APPLICATION_JSON_VALUE},
                     method = RequestMethod.PUT,
                     beanClass = Handler.class,
                     beanMethod = "updateLoanStatus",
                     operation = @Operation(
                             operationId = "updateLoanStatus",
-                            summary = "Actualizar estado de la solicitud",
-                            description = "Permite aprobar o rechazar una solicitud de préstamo",
-                            parameters = {
-                                    @Parameter(
-                                            name = "identification",
-                                            description = "Numero de identificacion",
-                                            required = true,
-                                            schema = @Schema(type = "string", defaultValue = "0")
-                                    ),
-                                    @Parameter(
-                                            name = "idLoanRequest",
-                                            description = "ID de la solicitud",
-                                            required = true,
-                                            schema = @Schema(type = "long")
-                                    ),
-                                    @Parameter(
-                                            name = "idState",
-                                            description = "ID del estado",
-                                            required = true,
-                                            schema = @Schema(type = "long")
-                                    )
-                            },
+                            summary = "Actualizar el estado de una solicitud de préstamo",
+                            description = "Permite aprobar o rechazar una solicitud",
                             requestBody = @RequestBody(
                                     required = true,
                                     content = @Content(
@@ -131,14 +107,39 @@ public class RouterRest {
                                     )
                             ),
                             responses = {
+                                    @ApiResponse(responseCode = "200", description = "Estado actualizado correctamente"),
+                                    @ApiResponse(responseCode = "401", description = "Usuario no autorizado"),
+                                    @ApiResponse(responseCode = "400", description = "Solicitud inválida")
+                            }
+                    )
+            ),
+
+            // 🚀 NUEVA RUTA PARA CAPACIDAD DE ENDEUDAMIENTO
+            @RouterOperation(
+                    path = "/api/v1/calculate-capacity",
+                    produces = {MediaType.APPLICATION_JSON_VALUE},
+                    method = RequestMethod.POST,
+                    beanClass = Handler.class,
+                    beanMethod = "calculateCapacity",
+                    operation = @Operation(
+                            operationId = "calculateCapacity",
+                            summary = "Calcular la capacidad de endeudamiento disponible",
+                            description = "Calcula si el solicitante puede asumir un nuevo préstamo y responde con una decisión (APPROVED, REJECTED, MANUAL_REVIEW).",
+                            requestBody = @RequestBody(
+                                    required = true,
+                                    content = @Content(
+                                            mediaType = "application/json",
+                                            schema = @Schema(implementation = CapacityTranslatorLoanRequest.class)
+                                    )
+                            ),
+                            responses = {
                                     @ApiResponse(
                                             responseCode = "200",
-                                            description = "Estado de la solicitud actualizado correctamente"
+                                            description = "Resultado del análisis de capacidad",
+                                            content = @Content(schema = @Schema(implementation = LoanDecisionResult.class))
                                     ),
-                                    @ApiResponse(
-                                            responseCode = "401",
-                                            description = "Usuario no autorizado"
-                                    )
+                                    @ApiResponse(responseCode = "400", description = "Solicitud inválida"),
+                                    @ApiResponse(responseCode = "401", description = "Token inválido o faltante")
                             }
                     )
             )
@@ -146,6 +147,9 @@ public class RouterRest {
     public RouterFunction<ServerResponse> routerFunction(Handler handler) {
         return route(POST("/api/loan-request"), handler::createLoanRequest)
                 .andRoute(GET("/api/get-requests"), handler::getRequests)
-               .andRoute(PUT("/api/loan-request/state/{id}"), handler::updateLoanStatus);
+                .andRoute(PUT("/api/loan-request/state"), handler::updateLoanStatus)
+                // 🚀 NUEVA RUTA REGISTRADA EN EL ROUTER
+                .andRoute(POST("/api/v1/calculate-capacity"), handler::calculateCapacity);
     }
 }
+

@@ -5,7 +5,7 @@ import lombok.Data;
 @Data
 public class UpdateLoanStatusRequest {
 
-        private Long idLoanRequest;
+        private Long idRequest;;
         private Long idState;
         private String identification;
 
